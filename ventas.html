@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Ventas del día</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f3ee; --card:#fff; --ink:#1f1b16; --muted:#7a7168; --line:#e6e0d7;
+    --des:#d9822b; --des-soft:#fbeedd; --com:#2f7d5b; --com-soft:#e1f1e9;
+    --bad:#c0392b; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;-webkit-tap-highlight-color:transparent}
+  .wrap{max-width:520px;margin:0 auto;padding:14px 14px 40px}
+  h1{font-size:1.35rem;margin:4px 0 2px}
+  .fecha{color:var(--muted);font-size:.9rem;margin-bottom:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+  details.card summary{font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+  details.card summary::after{content:"▾";color:var(--muted)}
+  details[open].card summary::after{content:"▴"}
+  .precios{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+  label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
+  input[type=number]{width:100%;font-size:1.15rem;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+  input:focus{outline:2px solid #00000022;border-color:#bbb}
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .tab{padding:14px;border-radius:var(--radius);border:2px solid var(--line);background:var(--card);font-size:1rem;font-weight:700;color:var(--muted)}
+  .tab.on[data-t=des]{border-color:var(--des);background:var(--des-soft);color:var(--des)}
+  .tab.on[data-t=com]{border-color:var(--com);background:var(--com-soft);color:var(--com)}
+  .tab small{display:block;font-weight:500;font-size:.8rem;margin-top:2px}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .seg button{padding:12px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:1rem;font-weight:600;color:var(--muted)}
+  .seg button.on{border-color:var(--des);color:var(--des);background:var(--des-soft)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .qty{display:flex;align-items:center;gap:6px}
+  .qty button{width:44px;height:46px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:1.4rem;flex:none}
+  .qty input{text-align:center}
+  .total{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);margin:4px 0 12px}
+  .total span{color:var(--muted)}
+  .total b{font-size:1.5rem}
+  .quick{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+  .quick button{padding:9px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:.95rem}
+  .cambio{border-radius:12px;padding:14px;text-align:center;margin-bottom:12px;background:#f3f1ed}
+  .cambio .lbl{font-size:.85rem;color:var(--muted)}
+  .cambio .val{font-size:2.2rem;font-weight:800;margin-top:2px}
+  .cambio.bad .val{color:var(--bad);font-size:1.3rem}
+  .btn{width:100%;padding:15px;border:0;border-radius:12px;font-size:1.05rem;font-weight:700;color:#fff}
+  .btn.des{background:var(--des)} .btn.com{background:var(--com)}
+  .btn.dark{background:var(--ink)} .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .btn:disabled{opacity:.4}
+  .list h3{margin:0 0 8px;font-size:1rem;display:flex;justify-content:space-between}
+  .list h3 span{color:var(--muted);font-weight:500}
+  .sale{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:.95rem}
+  .sale .meta{color:var(--muted);font-size:.8rem}
+  .sale .del{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;color:var(--muted);font-size:.85rem;margin-left:10px}
+  .sale .del.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+  .empty{color:var(--muted);font-size:.9rem;padding:6px 0}
+  .resumen{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:12px}
+  .resumen div{background:#f3f1ed;border-radius:10px;padding:10px 4px}
+  .resumen small{display:block;color:var(--muted);font-size:.75rem}
+  .resumen b{font-size:1.1rem}
+  .stack>*+*{margin-top:8px}
+  #reporte table{width:100%;border-collapse:collapse;font-size:.9rem;margin:6px 0 12px}
+  #reporte td,#reporte th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+  #reporte td:last-child,#reporte th:last-child{text-align:right}
+  #reporte h4{margin:12px 0 2px}
+  .msg{font-size:.85rem;color:var(--muted);text-align:center;min-height:1.2em}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ventas del día</h1>
+  <div class="fecha" id="fecha"></div>
+
+  <details class="card" id="preciosBox">
+    <summary>Precios</summary>
+    <div class="precios">
+      <div><label>Desayuno</label><input type="number" inputmode="decimal" id="pDes" placeholder="$"></div>
+      <div><label>Café</label><input type="number" inputmode="decimal" id="pCaf" placeholder="$"></div>
+      <div><label>Comida</label><input type="number" inputmode="decimal" id="pCom" placeholder="$"></div>
+    </div>
+    <div class="msg" style="margin-top:8px">También puedes cambiar el precio en cada venta.</div>
+  </details>
+
+  <div class="tabs">
+    <button class="tab on" data-t="des">🍳 Desayunos<small id="tabDes">$0</small></button>
+    <button class="tab" data-t="com">🍲 Comidas<small id="tabCom">$0</small></button>
+  </div>
+
+  <!-- Formulario de venta -->
+  <div class="card">
+    <div class="seg" id="segDes">
+      <button class="on" data-p="Desayuno">Desayuno</button>
+      <button data-p="Café">Café</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>Cantidad</label>
+        <div class="qty">
+          <button id="menos">−</button>
+          <input type="number" inputmode="numeric" id="cant" value="1" min="1">
+          <button id="mas">+</button>
+        </div>
+      </div>
+      <div>
+        <label>Precio c/u</label>
+        <input type="number" inputmode="decimal" id="precio" placeholder="$">
+      </div>
+    </div>
+    <div class="total"><span>Total</span><b id="total">$0</b></div>
+
+    <label>¿Con cuánto paga?</label>
+    <input type="number" inputmode="decimal" id="pago" placeholder="$">
+    <div class="quick" id="quick">
+      <button data-v="exacto">Exacto</button>
+      <button data-v="20">$20</button>
+      <button data-v="50">$50</button>
+      <button data-v="100">$100</button>
+      <button data-v="200">$200</button>
+      <button data-v="500">$500</button>
+    </div>
+
+    <div class="cambio" id="cambioBox">
+      <div class="lbl">Cambio a dar</div>
+      <div class="val" id="cambio">—</div>
+    </div>
+
+    <button class="btn des" id="registrar" disabled>Registrar venta</button>
+  </div>
+
+  <!-- Lista de ventas del turno -->
+  <div class="card list">
+    <h3 id="listaTitulo">Ventas de desayuno <span id="listaTotal"></span></h3>
+    <div id="lista"></div>
+  </div>
+
+  <!-- Reporte -->
+  <div class="card">
+    <div class="resumen">
+      <div><small>Desayunos</small><b id="rDes">$0</b></div>
+      <div><small>Comidas</small><b id="rCom">$0</b></div>
+      <div><small>Total</small><b id="rTot">$0</b></div>
+    </div>
+    <div class="stack">
+      <button class="btn dark" id="genRep">Generar reporte</button>
+      <div id="reporte" class="hide"></div>
+      <button class="btn dark hide" id="pdfBtn">Descargar PDF</button>
+      <div class="msg" id="pdfMsg"></div>
+      <button class="btn ghost" id="reset">Borrar todo y empezar nuevo día</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const money = n => "$" + (Math.round(n*100)/100).toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:2});
+const KEY = "ventas-dia-v1";
+
+let state = { precios:{Desayuno:"",Café:"",Comida:""}, ventas:[], fecha:new Date().toISOString().slice(0,10) };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.ventas) state = Object.assign(state, s); } catch(e){}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+let turno = "des";       // des | com
+let producto = "Desayuno";
+
+const fechaTxt = d => new Date(d+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+$("fecha").textContent = fechaTxt(state.fecha);
+
+// Precios
+const pMap = {Desayuno:"pDes", Café:"pCaf", Comida:"pCom"};
+for (const [prod,id] of Object.entries(pMap)){
+  $(id).value = state.precios[prod];
+  $(id).addEventListener("input", e => {
+    state.precios[prod] = e.target.value; save();
+    if (prod === producto) { $("precio").value = e.target.value; calc(); }
+  });
+}
+if (!state.precios.Desayuno && !state.precios.Comida) $("preciosBox").open = true;
+
+// Turnos
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTurno(b.dataset.t));
+function setTurno(t){
+  turno = t;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  $("segDes").classList.toggle("hide", t !== "des");
+  $("registrar").className = "btn " + t;
+  setProducto(t === "des" ? ( $("segDes").querySelector(".on").dataset.p ) : "Comida");
+  render();
+}
+$("segDes").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("segDes").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  setProducto(b.dataset.p);
+});
+function setProducto(p){ producto = p; $("precio").value = state.precios[p] || ""; calc(); }
+
+// Cantidad
+$("menos").onclick = () => { $("cant").value = Math.max(1, (+$("cant").value||1) - 1); calc(); };
+$("mas").onclick = () => { $("cant").value = (+$("cant").value||0) + 1; calc(); };
+["cant","precio","pago"].forEach(id => $(id).addEventListener("input", calc));
+
+// Pagos rápidos
+$("quick").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("pago").value = b.dataset.v === "exacto" ? totalActual() : b.dataset.v; calc();
+});
+
+function totalActual(){ return (Math.max(0, +$("cant").value || 0)) * (+$("precio").value || 0); }
+
+function calc(){
+  const tot = totalActual(), pago = $("pago").value === "" ? null : +$("pago").value;
+  $("total").textContent = money(tot);
+  const box = $("cambioBox");
+  box.classList.remove("bad");
+  let ok = tot > 0;
+  if (pago === null){ $("cambio").textContent = "—"; }
+  else if (pago < tot){ box.classList.add("bad"); $("cambio").textContent = "Faltan " + money(tot - pago); ok = false; }
+  else { $("cambio").textContent = money(pago - tot); }
+  // Si no pone con cuánto pagó, se registra como pago exacto
+  $("registrar").disabled = !ok;
+}
+
+$("registrar").onclick = () => {
+  const cant = Math.max(1, +$("cant").value || 1), precio = +$("precio").value || 0;
+  const total = cant * precio;
+  const pago = $("pago").value === "" ? total : +$("pago").value;
+  if (total <= 0 || pago < total) return;
+  state.ventas.push({ id: Date.now(), turno, producto, cant, precio, total, pago, cambio: pago - total,
+                      hora: new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}) });
+  save();
+  $("cant").value = 1; $("pago").value = "";
+  calc(); render(); hideReport();
+  toast("Venta registrada · " + money(total));
+};
+
+// Lista
+let armed = null;
+function render(){
+  const des = state.ventas.filter(v => v.turno === "des"), com = state.ventas.filter(v => v.turno === "com");
+  const sum = a => a.reduce((s,v) => s + v.total, 0);
+  $("tabDes").textContent = money(sum(des)); $("tabCom").textContent = money(sum(com));
+  $("rDes").textContent = money(sum(des)); $("rCom").textContent = money(sum(com)); $("rTot").textContent = money(sum(state.ventas));
+
+  const lista = turno === "des" ? des : com;
+  $("listaTitulo").firstChild.textContent = (turno === "des" ? "Ventas de desayuno " : "Ventas de comida ");
+  $("listaTotal").textContent = lista.length + " · " + money(sum(lista));
+  const el = $("lista"); el.innerHTML = "";
+  if (!lista.length){ el.innerHTML = '<div class="empty">Aún no hay ventas en este turno.</div>'; return; }
+  [...lista].reverse().forEach(v => {
+    const d = document.createElement("div"); d.className = "sale";
+    d.innerHTML = `<div><div>${v.cant} × ${v.producto} <b>${money(v.total)}</b></div>
+      <div class="meta">${v.hora} · pagó ${money(v.pago)} · cambio ${money(v.cambio)}</div></div>`;
+    const b = document.createElement("button"); b.className = "del"; b.textContent = "Quitar";
+    b.onclick = () => {
+      if (armed === v.id){ state.ventas = state.ventas.filter(x => x.id !== v.id); armed = null; save(); render(); hideReport(); toast("Venta eliminada"); }
+      else { armed = v.id; render(); }
+    };
+    if (armed === v.id){ b.classList.add("armed"); b.textContent = "¿Seguro?"; }
+    d.appendChild(b); el.appendChild(d);
+  });
+}
+
+// Reporte
+function resumen(t){
+  const vs = state.ventas.filter(v => v.turno === t), out = {};
+  vs.forEach(v => { out[v.producto] = out[v.producto] || {cant:0,total:0}; out[v.producto].cant += v.cant; out[v.producto].total += v.total; });
+  return { vs, prods: out, total: vs.reduce((s,v)=>s+v.total,0), cant: vs.reduce((s,v)=>s+v.cant,0) };
+}
+function hideReport(){ $("reporte").classList.add("hide"); $("pdfBtn").classList.add("hide"); $("pdfMsg").textContent = ""; }
+
+$("genRep").onclick = () => {
+  const D = resumen("des"), C = resumen("com");
+  const tabla = (r) => {
+    const filas = Object.entries(r.prods).map(([p,o]) => `<tr><td>${p}</td><td>${o.cant}</td><td>${money(o.total)}</td></tr>`).join("");
+    return `<table><tr><th>Producto</th><th>Cant.</th><th>Importe</th></tr>${filas || '<tr><td colspan="3">Sin ventas</td></tr>'}
+      <tr><th>Subtotal</th><th>${r.cant}</th><th>${money(r.total)}</th></tr></table>`;
+  };
+  $("reporte").innerHTML = `<h4>Desayunos (${D.vs.length} ventas)</h4>${tabla(D)}
+    <h4>Comidas (${C.vs.length} ventas)</h4>${tabla(C)}
+    <table><tr><th>TOTAL DEL DÍA</th><th></th><th>${money(D.total + C.total)}</th></tr></table>`;
+  $("reporte").classList.remove("hide");
+  $("pdfBtn").classList.remove("hide");
+  $("pdfMsg").textContent = "";
+};
+
+let downloads = null;
+if (window.claude && claude.use) claude.use("downloads").then(d => downloads = d).catch(()=>{});
+
+$("pdfBtn").onclick = async () => {
+  if (!window.jspdf){ $("pdfMsg").textContent = "No se pudo cargar el generador de PDF. Revisa tu conexión."; return; }
+  const doc = buildPDF();
+  const nombre = "reporte-ventas-" + state.fecha + ".pdf";
+  if (downloads){
+    try { await downloads.save({ filename: nombre, data: doc.output("blob") }); $("pdfMsg").textContent = "PDF guardado ✔"; }
+    catch(e){ $("pdfMsg").textContent = e && e.code === "declined" ? "Descarga cancelada." : "No se pudo descargar aquí."; }
+  } else {
+    try { doc.save(nombre); $("pdfMsg").textContent = "Si no se descargó, toma captura del reporte."; }
+    catch(e){ $("pdfMsg").textContent = "No se pudo descargar aquí."; }
+  }
+};
+
+function buildPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"mm", format:"a4" });
+  const W = 210, M = 15; let y = 18;
+  const line = () => { doc.setDrawColor(220); doc.line(M, y, W-M, y); y += 5; };
+  const check = (h=8) => { if (y + h > 285){ doc.addPage(); y = 18; } };
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.text("Reporte de ventas", M, y); y += 7;
+  doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(110);
+  doc.text(fechaTxt(state.fecha), M, y); y += 5;
+  doc.text("Generado: " + new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), M, y); y += 8;
+  doc.setTextColor(0);
+
+  const D = resumen("des"), C = resumen("com");
+  // Resumen general
+  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.text("Resumen", M, y); y += 6; line();
+  doc.setFontSize(11);
+  const rowR = (a, b, c, bold) => { check(); doc.setFont("helvetica", bold ? "bold":"normal"); doc.text(a, M, y); doc.text(String(b), 130, y, {align:"right"}); doc.text(c, W-M, y, {align:"right"}); y += 6; };
+  rowR("Turno / producto", "Cant.", "Importe", true);
+  [["Desayunos", D], ["Comidas", C]].forEach(([n, r]) => {
+    rowR(n, r.cant, money(r.total), true);
+    Object.entries(r.prods).forEach(([p,o]) => rowR("   " + p, o.cant, money(o.total)));
+  });
+  line();
+  doc.setFontSize(13); rowR("TOTAL DEL DÍA", D.cant + C.cant, money(D.total + C.total), true); y += 6;
+
+  // Detalle
+  [["Detalle de desayunos", D.vs], ["Detalle de comidas", C.vs]].forEach(([titulo, vs]) => {
+    check(20);
+    doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.text(titulo, M, y); y += 6; line();
+    doc.setFontSize(10);
+    const cols = [M, M+18, M+78, M+108, M+140, W-M];
+    const row = (vals, bold) => { check(); doc.setFont("helvetica", bold?"bold":"normal");
+      doc.text(vals[0], cols[0], y); doc.text(vals[1], cols[1], y);
+      doc.text(vals[2], cols[3], y, {align:"right"}); doc.text(vals[3], cols[4], y, {align:"right"});
+      doc.text(vals[4], cols[5], y, {align:"right"}); y += 5.5; };
+    row(["Hora","Producto","Total","Pagó","Cambio"], true);
+    if (!vs.length) row(["—","Sin ventas","","",""]);
+    vs.forEach(v => row([v.hora, v.cant + " x " + v.producto, money(v.total), money(v.pago), money(v.cambio)]));
+    y += 6;
+  });
+  return doc;
+}
+
+// Reiniciar día
+let resetArmed = false;
+$("reset").onclick = () => {
+  if (!resetArmed){ resetArmed = true; $("reset").textContent = "Toca otra vez para borrar todas las ventas"; $("reset").style.color = "var(--bad)";
+    setTimeout(() => { resetArmed = false; $("reset").textContent = "Borrar todo y empezar nuevo día"; $("reset").style.color = ""; }, 4000); return; }
+  state.ventas = []; state.fecha = new Date().toISOString().slice(0,10); save();
+  $("fecha").textContent = fechaTxt(state.fecha);
+  resetArmed = false; $("reset").textContent = "Borrar todo y empezar nuevo día"; $("reset").style.color = "";
+  render(); hideReport(); toast("Listo, día nuevo");
+};
+
+let tt; function toast(t){ $("toast").textContent = t; $("toast").classList.add("show"); clearTimeout(tt); tt = setTimeout(()=>$("toast").classList.remove("show"), 1800); }
+
+setTurno("des");
+</script>
+</body>
+</html>
