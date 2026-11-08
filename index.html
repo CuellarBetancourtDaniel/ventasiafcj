@@ -22,7 +22,7 @@
   details[open].card summary::after{content:"▴"}
   .precios{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
   label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
-  input[type=number]{width:100%;font-size:1.15rem;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+  input[type=number],input[type=text]{width:100%;font-size:1.15rem;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
   input:focus{outline:2px solid #00000022;border-color:#bbb}
   .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
   .tab{padding:14px;border-radius:var(--radius);border:2px solid var(--line);background:var(--card);font-size:1rem;font-weight:700;color:var(--muted)}
@@ -69,6 +69,21 @@
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
   .toast.show{opacity:1}
   .hide{display:none}
+  .link{display:block;width:100%;background:none;border:1px dashed var(--muted);color:var(--ink);border-radius:10px;padding:11px;font-size:.95rem;margin-bottom:12px}
+  .seg.deu button.on[data-k=debemos]{border-color:#b9770e;color:#b9770e;background:#fdf2e0}
+  .seg.deu button.on[data-k=nosdebe]{border-color:#2563a8;color:#2563a8;background:#e4eefa}
+  .aviso{background:#fff7e6;border:1px solid #f0d9a8;border-radius:10px;padding:10px;font-size:.88rem;margin-bottom:10px}
+  .deuda{padding:10px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .deuda .tag{font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:999px;margin-right:6px}
+  .tag.debemos{background:#fdf2e0;color:#b9770e} .tag.nosdebe{background:#e4eefa;color:#2563a8}
+  .deuda.ok{opacity:.5} .deuda.ok .nm{text-decoration:line-through}
+  .deuda .acc{display:flex;gap:6px;flex:none}
+  .deuda .acc button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 9px;font-size:.82rem}
+  .deuda .acc button.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+  .pend-res{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;margin-bottom:12px}
+  .pend-res div{border-radius:10px;padding:8px 4px}
+  .pend-res small{display:block;font-size:.75rem}
+  .pend-res .a{background:#fdf2e0;color:#b9770e} .pend-res .b{background:#e4eefa;color:#2563a8}
 </style>
 </head>
 <body>
@@ -128,6 +143,7 @@
       <div class="lbl">Cambio a dar</div>
       <div class="val" id="cambio">—</div>
     </div>
+    <button class="link hide" id="sinCambio"></button>
 
     <button class="btn des" id="registrar" disabled>Registrar venta</button>
   </div>
@@ -136,6 +152,31 @@
   <div class="card list">
     <h3 id="listaTitulo">Ventas de desayuno <span id="listaTotal"></span></h3>
     <div id="lista"></div>
+  </div>
+
+  <!-- Pendientes -->
+  <div class="card" id="pendCard">
+    <h3 style="margin:0 0 10px;font-size:1rem">Pendientes de cambio / deudas</h3>
+    <div class="pend-res">
+      <div class="a"><small>Les debemos</small><b id="totDebemos">$0</b></div>
+      <div class="b"><small>Nos deben</small><b id="totNosDeben">$0</b></div>
+    </div>
+    <div class="aviso hide" id="avisoVenta"></div>
+    <div class="seg deu" id="segDeu">
+      <button class="on" data-k="debemos">Le debemos</button>
+      <button data-k="nosdebe">Nos debe</button>
+    </div>
+    <div class="row">
+      <div><label>Nombre</label><input type="text" id="dNom" autocomplete="off"></div>
+      <div><label>Apellido</label><input type="text" id="dApe" autocomplete="off"></div>
+    </div>
+    <div class="row">
+      <div><label>Cantidad</label><input type="number" inputmode="decimal" id="dMonto" placeholder="$"></div>
+      <div><label>Nota (opcional)</label><input type="text" id="dNota" placeholder="ej. lentes, salón 2" autocomplete="off"></div>
+    </div>
+    <button class="btn dark" id="dGuardar" disabled>Anotar</button>
+    <button class="btn ghost hide" id="dCancelar" style="margin-top:8px">Cancelar</button>
+    <div id="dLista" style="margin-top:12px"></div>
   </div>
 
   <!-- Reporte -->
@@ -150,7 +191,8 @@
       <div id="reporte" class="hide"></div>
       <button class="btn dark hide" id="pdfBtn">Descargar PDF</button>
       <div class="msg" id="pdfMsg"></div>
-      <button class="btn ghost" id="reset">Borrar todo y empezar nuevo día</button>
+      <button class="btn ghost" id="reset">Empezar nuevo día</button>
+      <div class="msg">Borra las ventas y lo ya saldado. Los pendientes sin saldar se quedan.</div>
     </div>
   </div>
 </div>
@@ -161,8 +203,11 @@ const $ = id => document.getElementById(id);
 const money = n => "$" + (Math.round(n*100)/100).toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:2});
 const KEY = "ventas-dia-v1";
 
-let state = { precios:{Desayuno:"",Café:"",Comida:""}, ventas:[], fecha:new Date().toISOString().slice(0,10) };
+let state = { precios:{Desayuno:"",Café:"",Comida:""}, ventas:[], deudas:[], fecha:new Date().toISOString().slice(0,10) };
 try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.ventas) state = Object.assign(state, s); } catch(e){}
+if (!Array.isArray(state.deudas)) state.deudas = [];
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const horaAhora = () => new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"});
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 
 let turno = "des";       // des | com
@@ -221,20 +266,108 @@ function calc(){
   else { $("cambio").textContent = money(pago - tot); }
   // Si no pone con cuánto pagó, se registra como pago exacto
   $("registrar").disabled = !ok;
+
+  // Atajo a pendientes
+  const sc = $("sinCambio");
+  if (tot > 0 && pago !== null && pago > tot){ sc.dataset.k = "debemos"; sc.textContent = "¿No tienes todo el cambio? Registrar y anotar que le debemos"; sc.classList.remove("hide"); }
+  else if (tot > 0 && pago !== null && pago < tot){ sc.dataset.k = "nosdebe"; sc.textContent = "Registrar venta y anotar que nos debe " + money(tot - pago); sc.classList.remove("hide"); }
+  else sc.classList.add("hide");
 }
 
-$("registrar").onclick = () => {
+function ventaActual(){
   const cant = Math.max(1, +$("cant").value || 1), precio = +$("precio").value || 0;
   const total = cant * precio;
   const pago = $("pago").value === "" ? total : +$("pago").value;
-  if (total <= 0 || pago < total) return;
-  state.ventas.push({ id: Date.now(), turno, producto, cant, precio, total, pago, cambio: pago - total,
-                      hora: new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}) });
-  save();
+  return { id: Date.now(), turno, producto, cant, precio, total, pago,
+           cambio: Math.max(0, pago - total), debe: Math.max(0, total - pago), hora: horaAhora() };
+}
+function guardarVenta(v){
+  state.ventas.push(v); save();
   $("cant").value = 1; $("pago").value = "";
   calc(); render(); hideReport();
-  toast("Venta registrada · " + money(total));
+}
+
+$("registrar").onclick = () => {
+  const v = ventaActual();
+  if (v.total <= 0 || v.pago < v.total) return;
+  guardarVenta(v);
+  toast("Venta registrada · " + money(v.total));
 };
+
+// ---------- Pendientes ----------
+let tipoDeuda = "debemos";
+let ventaPendiente = null;   // venta que se registra al anotar "nos debe"
+let ventaLigada = null;      // id de venta ya registrada a la que se liga la deuda
+
+function setTipo(k){
+  tipoDeuda = k;
+  $("segDeu").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === k));
+}
+$("segDeu").querySelectorAll("button").forEach(b => b.onclick = () => setTipo(b.dataset.k));
+["dNom","dApe","dMonto"].forEach(id => $(id).addEventListener("input", validarDeuda));
+function validarDeuda(){ $("dGuardar").disabled = !($("dNom").value.trim() && (+$("dMonto").value > 0)); }
+
+function limpiarDeuda(){
+  ["dNom","dApe","dMonto","dNota"].forEach(id => $(id).value = "");
+  ventaPendiente = null; ventaLigada = null;
+  $("avisoVenta").classList.add("hide"); $("dCancelar").classList.add("hide");
+  validarDeuda();
+}
+
+$("sinCambio").onclick = () => {
+  const v = ventaActual();
+  limpiarDeuda();
+  if ($("sinCambio").dataset.k === "debemos"){
+    guardarVenta(v); ventaLigada = v.id;
+    setTipo("debemos"); $("dMonto").value = v.cambio;
+    $("avisoVenta").innerHTML = `Venta registrada (${v.cant} × ${esc(v.producto)}, cambio ${money(v.cambio)}). Pon el nombre y <b>cuánto le quedamos debiendo</b>.`;
+    toast("Venta registrada");
+  } else {
+    ventaPendiente = v;
+    setTipo("nosdebe"); $("dMonto").value = v.debe;
+    $("avisoVenta").innerHTML = `Al anotar se registra la venta de ${money(v.total)} (pagó ${money(v.pago)}, debe ${money(v.debe)}).`;
+    $("dCancelar").classList.remove("hide");
+  }
+  $("avisoVenta").classList.remove("hide");
+  validarDeuda();
+  $("pendCard").scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(() => $("dNom").focus(), 350);
+};
+$("dCancelar").onclick = limpiarDeuda;
+
+$("dGuardar").onclick = () => {
+  const nombre = $("dNom").value.trim(), apellido = $("dApe").value.trim(), monto = +$("dMonto").value;
+  if (!nombre || !(monto > 0)) return;
+  if (ventaPendiente){ guardarVenta(ventaPendiente); ventaLigada = ventaPendiente.id; }
+  state.deudas.push({ id: Date.now()+1, tipo: tipoDeuda, nombre, apellido, monto, nota: $("dNota").value.trim(),
+                      hora: horaAhora(), fecha: state.fecha, saldado: false, venta: ventaLigada });
+  save(); limpiarDeuda(); renderDeudas(); hideReport();
+  toast("Anotado");
+};
+
+let dArmed = null;
+function renderDeudas(){
+  const pend = state.deudas.filter(d => !d.saldado);
+  const s = t => pend.filter(d => d.tipo === t).reduce((a,d) => a + d.monto, 0);
+  $("totDebemos").textContent = money(s("debemos")); $("totNosDeben").textContent = money(s("nosdebe"));
+  const el = $("dLista"); el.innerHTML = "";
+  if (!state.deudas.length){ el.innerHTML = '<div class="empty">Sin pendientes.</div>'; return; }
+  const orden = [...state.deudas].sort((a,b) => (a.saldado - b.saldado) || (b.id - a.id));
+  orden.forEach(d => {
+    const row = document.createElement("div"); row.className = "deuda" + (d.saldado ? " ok" : "");
+    const otroDia = d.fecha && d.fecha !== state.fecha ? " · " + d.fecha : "";
+    row.innerHTML = `<div><div class="nm"><span class="tag ${d.tipo}">${d.tipo === "debemos" ? "LE DEBEMOS" : "NOS DEBE"}</span><b>${money(d.monto)}</b></div>
+      <div>${esc(d.nombre)} ${esc(d.apellido)}</div>
+      <div class="meta" style="color:var(--muted);font-size:.8rem">${d.hora}${otroDia}${d.nota ? " · " + esc(d.nota) : ""}${d.saldado ? " · saldado" : ""}</div></div>`;
+    const acc = document.createElement("div"); acc.className = "acc";
+    const ok = document.createElement("button"); ok.textContent = d.saldado ? "Deshacer" : "✓ Saldado";
+    ok.onclick = () => { d.saldado = !d.saldado; save(); renderDeudas(); hideReport(); toast(d.saldado ? "Marcado como saldado" : "Pendiente otra vez"); };
+    const del = document.createElement("button"); del.textContent = dArmed === d.id ? "¿Seguro?" : "Quitar";
+    if (dArmed === d.id) del.classList.add("armed");
+    del.onclick = () => { if (dArmed === d.id){ state.deudas = state.deudas.filter(x => x.id !== d.id); dArmed = null; save(); hideReport(); } else dArmed = d.id; renderDeudas(); };
+    acc.append(ok, del); row.appendChild(acc); el.appendChild(row);
+  });
+}
 
 // Lista
 let armed = null;
@@ -252,7 +385,7 @@ function render(){
   [...lista].reverse().forEach(v => {
     const d = document.createElement("div"); d.className = "sale";
     d.innerHTML = `<div><div>${v.cant} × ${v.producto} <b>${money(v.total)}</b></div>
-      <div class="meta">${v.hora} · pagó ${money(v.pago)} · cambio ${money(v.cambio)}</div></div>`;
+      <div class="meta">${v.hora} · pagó ${money(v.pago)} · ${v.debe ? "<b style='color:#2563a8'>debe " + money(v.debe) + "</b>" : "cambio " + money(v.cambio)}</div></div>`;
     const b = document.createElement("button"); b.className = "del"; b.textContent = "Quitar";
     b.onclick = () => {
       if (armed === v.id){ state.ventas = state.ventas.filter(x => x.id !== v.id); armed = null; save(); render(); hideReport(); toast("Venta eliminada"); }
@@ -269,6 +402,19 @@ function resumen(t){
   vs.forEach(v => { out[v.producto] = out[v.producto] || {cant:0,total:0}; out[v.producto].cant += v.cant; out[v.producto].total += v.total; });
   return { vs, prods: out, total: vs.reduce((s,v)=>s+v.total,0), cant: vs.reduce((s,v)=>s+v.cant,0) };
 }
+function resumenDeudas(){
+  const pend = state.deudas.filter(d => !d.saldado);
+  const s = t => pend.filter(d => d.tipo === t).reduce((a,d) => a + d.monto, 0);
+  return { pend, sald: state.deudas.filter(d => d.saldado), debemos: s("debemos"), nosdeben: s("nosdebe") };
+}
+function tablaDeudas(){
+  const R = resumenDeudas();
+  const fila = d => `<tr><td>${d.tipo === "debemos" ? "Le debemos a" : "Nos debe"} ${esc(d.nombre)} ${esc(d.apellido)}${d.nota ? " <small>(" + esc(d.nota) + ")</small>" : ""}</td><td>${d.saldado ? "saldado" : "pendiente"}</td><td>${money(d.monto)}</td></tr>`;
+  return `<h4>Pendientes</h4><table><tr><th>Persona</th><th>Estado</th><th>Monto</th></tr>
+    ${[...R.pend, ...R.sald].map(fila).join("") || '<tr><td colspan="3">Sin pendientes</td></tr>'}
+    <tr><th>Les debemos (pendiente)</th><th></th><th>${money(R.debemos)}</th></tr>
+    <tr><th>Nos deben (pendiente)</th><th></th><th>${money(R.nosdeben)}</th></tr></table>`;
+}
 function hideReport(){ $("reporte").classList.add("hide"); $("pdfBtn").classList.add("hide"); $("pdfMsg").textContent = ""; }
 
 $("genRep").onclick = () => {
@@ -280,7 +426,8 @@ $("genRep").onclick = () => {
   };
   $("reporte").innerHTML = `<h4>Desayunos (${D.vs.length} ventas)</h4>${tabla(D)}
     <h4>Comidas (${C.vs.length} ventas)</h4>${tabla(C)}
-    <table><tr><th>TOTAL DEL DÍA</th><th></th><th>${money(D.total + C.total)}</th></tr></table>`;
+    <table><tr><th>TOTAL DEL DÍA</th><th></th><th>${money(D.total + C.total)}</th></tr></table>
+    ${tablaDeudas()}`;
   $("reporte").classList.remove("hide");
   $("pdfBtn").classList.remove("hide");
   $("pdfMsg").textContent = "";
@@ -338,10 +485,26 @@ function buildPDF(){
       doc.text(vals[2], cols[3], y, {align:"right"}); doc.text(vals[3], cols[4], y, {align:"right"});
       doc.text(vals[4], cols[5], y, {align:"right"}); y += 5.5; };
     row(["Hora","Producto","Total","Pagó","Cambio"], true);
-    if (!vs.length) row(["—","Sin ventas","","",""]);
-    vs.forEach(v => row([v.hora, v.cant + " x " + v.producto, money(v.total), money(v.pago), money(v.cambio)]));
+    if (!vs.length) row(["-","Sin ventas","","",""]);
+    vs.forEach(v => row([v.hora, v.cant + " x " + v.producto, money(v.total), money(v.pago), v.debe ? "debe " + money(v.debe) : money(v.cambio)]));
     y += 6;
   });
+
+  // Pendientes
+  const R = resumenDeudas();
+  check(30);
+  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.text("Pendientes de cambio / deudas", M, y); y += 6; line();
+  doc.setFontSize(10);
+  const rowD = (a, b, c, d, bold) => { check(); doc.setFont("helvetica", bold?"bold":"normal");
+    doc.text(a, M, y); doc.text(doc.splitTextToSize(b, 85)[0], M+28, y); doc.text(c, M+125, y); doc.text(d, W-M, y, {align:"right"}); y += 5.5; };
+  rowD("Tipo", "Persona", "Estado", "Monto", true);
+  const todas = [...R.pend, ...R.sald];
+  if (!todas.length) rowD("-", "Sin pendientes", "", "");
+  todas.forEach(d => rowD(d.tipo === "debemos" ? "Le debemos" : "Nos debe",
+    (d.nombre + " " + d.apellido).trim() + (d.nota ? " (" + d.nota + ")" : ""), d.saldado ? "saldado" : "pendiente", money(d.monto)));
+  y += 2; line(); doc.setFontSize(11);
+  rowD("", "Les debemos (pendiente)", "", money(R.debemos), true);
+  rowD("", "Nos deben (pendiente)", "", money(R.nosdeben), true);
   return doc;
 }
 
@@ -349,16 +512,18 @@ function buildPDF(){
 let resetArmed = false;
 $("reset").onclick = () => {
   if (!resetArmed){ resetArmed = true; $("reset").textContent = "Toca otra vez para borrar todas las ventas"; $("reset").style.color = "var(--bad)";
-    setTimeout(() => { resetArmed = false; $("reset").textContent = "Borrar todo y empezar nuevo día"; $("reset").style.color = ""; }, 4000); return; }
-  state.ventas = []; state.fecha = new Date().toISOString().slice(0,10); save();
+    setTimeout(() => { resetArmed = false; $("reset").textContent = "Empezar nuevo día"; $("reset").style.color = ""; }, 4000); return; }
+  state.ventas = []; state.deudas = state.deudas.filter(d => !d.saldado);
+  state.fecha = new Date().toISOString().slice(0,10); save();
   $("fecha").textContent = fechaTxt(state.fecha);
-  resetArmed = false; $("reset").textContent = "Borrar todo y empezar nuevo día"; $("reset").style.color = "";
-  render(); hideReport(); toast("Listo, día nuevo");
+  resetArmed = false; $("reset").textContent = "Empezar nuevo día"; $("reset").style.color = "";
+  limpiarDeuda(); render(); renderDeudas(); hideReport(); toast("Listo, día nuevo");
 };
 
 let tt; function toast(t){ $("toast").textContent = t; $("toast").classList.add("show"); clearTimeout(tt); tt = setTimeout(()=>$("toast").classList.remove("show"), 1800); }
 
 setTurno("des");
+renderDeudas();
 </script>
 </body>
 </html>
